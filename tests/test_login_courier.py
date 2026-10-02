@@ -1,92 +1,56 @@
 import allure
-import requests
-
-from helpers import (
-    BASE_URL,
-    generate_random_string,
-    login_courier,
-    register_new_courier_and_return_login_password
+import pytest
+from api import login_courier
+from data import (
+    ACCOUNT_NOT_FOUND_MESSAGE,
+    LOGIN_REQUIRED_MESSAGE
 )
+from helpers import generate_random_string
 
 
 @allure.feature("Авторизация курьера")
 class TestLoginCourier:
 
     @allure.title("Авторизация курьера с корректными данными")
-    def test_login_courier_success(self, cleanup_courier):
-        courier = register_new_courier_and_return_login_password()
-
+    def test_login_courier_success(self, courier):
         response = login_courier(
-            courier[0],
-            courier[1]
+            courier["login"],
+            courier["password"]
         )
 
         assert response.status_code == 200
         assert "id" in response.json()
 
-        cleanup_courier(response.json()["id"])
-
     @allure.title("Авторизация курьера с неверным паролем")
-    def test_login_courier_wrong_password(self, cleanup_courier):
-        courier = register_new_courier_and_return_login_password()
-
+    def test_login_courier_wrong_password(self, courier):
         response = login_courier(
-            courier[0],
+            courier["login"],
             generate_random_string(10)
         )
 
         assert response.status_code == 404
-        assert response.json()["message"] == "Учетная запись не найдена"
-
-        login_response = login_courier(
-            courier[0],
-            courier[1]
-        )
-
-        cleanup_courier(login_response.json()["id"])
+        assert response.json()["message"] == ACCOUNT_NOT_FOUND_MESSAGE
 
     @allure.title("Авторизация курьера без логина")
-    def test_login_courier_without_login(self, cleanup_courier):
-        courier = register_new_courier_and_return_login_password()
-
-        response = requests.post(
-            f"{BASE_URL}/courier/login",
-            data={
-                "password": courier[1]
-            }
+    def test_login_courier_without_login(self, courier):
+        response = login_courier(
+            password=courier["password"]
         )
 
         assert response.status_code == 400
-        assert response.json()["message"] == (
-            "Недостаточно данных для входа"
-        )
-
-        login_response = login_courier(
-            courier[0],
-            courier[1]
-        )
-
-        cleanup_courier(login_response.json()["id"])
+        assert response.json()["message"] == LOGIN_REQUIRED_MESSAGE
 
     @allure.title("Авторизация курьера без пароля")
-    def test_login_courier_without_password(self, cleanup_courier):
-        courier = register_new_courier_and_return_login_password()
-
-        response = requests.post(
-            f"{BASE_URL}/courier/login",
-            data={
-                "login": courier[0]
-            }
+    @pytest.mark.xfail(
+        reason="API возвращает 504 вместо ожидаемого по документации 400"
+    )
+    def test_login_courier_without_password(self, courier):
+        response = login_courier(
+            login=courier["login"]
         )
 
-        assert response.status_code == 504
-
-        login_response = login_courier(
-            courier[0],
-            courier[1]
-        )
-
-        cleanup_courier(login_response.json()["id"])
+        assert response.status_code == 400
+        assert response.json()["message"] == LOGIN_REQUIRED_MESSAGE
 
     @allure.title("Авторизация несуществующего курьера")
     def test_login_nonexistent_courier(self):
@@ -96,5 +60,4 @@ class TestLoginCourier:
         )
 
         assert response.status_code == 404
-        assert response.json()["message"] == "Учетная запись не найдена"
-        
+        assert response.json()["message"] == ACCOUNT_NOT_FOUND_MESSAGE

@@ -1,7 +1,6 @@
 import allure
 import pytest
-import requests
-from helpers import BASE_URL
+from api import create_order
 
 
 @allure.feature("Создание заказа")
@@ -32,10 +31,7 @@ class TestCreateOrder:
         if color is not None:
             payload["color"] = color
 
-        response = requests.post(
-            f"{BASE_URL}/orders",
-            json=payload
-        )
+        response = create_order(payload)
 
         assert response.status_code == 201
         assert "track" in response.json()
